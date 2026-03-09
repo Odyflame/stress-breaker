@@ -1,0 +1,59 @@
+import { useState, useCallback } from 'react';
+
+// 아이템 밸런스 테이블 (자판기 제거)
+export const STAGE_DATA = [
+    { step: 1, name: '마우스', maxHP: 25, place: '내 책상' },
+    { step: 2, name: '키보드', maxHP: 50, place: '내 책상' },
+    { step: 3, name: '모니터', maxHP: 100, place: '내 책상' },
+    { step: 4, name: '맥북', maxHP: 150, place: '회의실' },
+    { step: 5, name: '사무실 의자', maxHP: 200, place: '사무실 복도' },
+    { step: 6, name: '스마트폰', maxHP: 500, place: '사장님실 앞' },
+];
+
+export function useGameLogic() {
+    const [currentStage, setCurrentStage] = useState(1);
+    const [currentHP, setCurrentHP] = useState(STAGE_DATA[0].maxHP);
+    const [totalPoints, setTotalPoints] = useState(0);
+
+    // 햅틱 진동 Mock
+    const triggerHaptic = useCallback(() => {
+        if (window.navigator && window.navigator.vibrate) {
+            window.navigator.vibrate(50);
+        } else {
+            console.log('Haptic vibration triggered');
+        }
+    }, []);
+
+    // 터치 액션 (물건 부수기)
+    const handleTouch = useCallback(() => {
+        if (currentHP <= 0) return;
+        triggerHaptic();
+        setCurrentHP((prev) => Math.max(0, prev - 1));
+    }, [currentHP, triggerHaptic]);
+
+    // 보상 지급 (1~10 포인트)
+    const calculateReward = useCallback(() => {
+        const reward = Math.floor(Math.random() * 10) + 1;
+        setTotalPoints((prev) => prev + reward);
+        return reward;
+    }, []);
+
+    // 다음 스테이지 넘어가기
+    const nextStage = useCallback(() => {
+        const next = currentStage + 1;
+        if (next <= STAGE_DATA.length) {
+            setCurrentStage(next);
+            setCurrentHP(STAGE_DATA[next - 1].maxHP);
+        }
+    }, [currentStage]);
+
+    return {
+        currentStage,
+        currentHP,
+        stageInfo: STAGE_DATA[currentStage - 1],
+        totalPoints,
+        handleTouch,
+        calculateReward,
+        nextStage,
+    };
+}
