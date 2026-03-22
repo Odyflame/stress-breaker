@@ -13,7 +13,7 @@ export const STAGE_DATA = [
 export function useGameLogic() {
     const [currentStage, setCurrentStage] = useState(1);
     const [currentHP, setCurrentHP] = useState(STAGE_DATA[0].maxHP);
-    const [totalPoints, setTotalPoints] = useState(0);
+    const [totalBolts, setTotalBolts] = useState(0);
     const [allCleared, setAllCleared] = useState(false);
 
     // 햅틱 진동 Mock
@@ -32,10 +32,10 @@ export function useGameLogic() {
         setCurrentHP((prev) => Math.max(0, prev - 1));
     }, [currentHP, triggerHaptic]);
 
-    // 보상 지급 (1~10 포인트)
+    // 보상 지급 (1~3 나사)
     const calculateReward = useCallback(() => {
-        const reward = Math.floor(Math.random() * 10) + 1;
-        setTotalPoints((prev) => prev + reward);
+        const reward = Math.floor(Math.random() * 3) + 1;
+        setTotalBolts((prev) => prev + reward);
         return reward;
     }, []);
 
@@ -58,7 +58,7 @@ export function useGameLogic() {
     const resetGame = useCallback(() => {
         setCurrentStage(1);
         setCurrentHP(STAGE_DATA[0].maxHP);
-        setTotalPoints(0);
+        setTotalBolts(0);
         setAllCleared(false);
     }, []);
 
@@ -66,7 +66,7 @@ export function useGameLogic() {
         currentStage,
         currentHP,
         stageInfo: STAGE_DATA[Math.min(currentStage - 1, STAGE_DATA.length - 1)],
-        totalPoints,
+        totalBolts,
         allCleared,
         isLastStage,
         handleTouch,

@@ -40,7 +40,7 @@ export default function App() {
           onEnd={goToResult}
         />
       )}
-      {screen === 'result' && <ResultView totalPoints={game.totalPoints} onReset={goToLobby} />}
+      {screen === 'result' && <ResultView totalBolts={game.totalBolts} onReset={goToLobby} />}
     </TDSMobileProvider>
   );
 }

@@ -187,15 +187,15 @@ export function StageView({ game, onEnd }: any) {
             {showReward && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
                     <div style={{ backgroundColor: '#fff', borderRadius: '24px', padding: '32px 24px', width: '80%', textAlign: 'center' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎉</div>
+                        <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔩</div>
                         <Text as="h3" typography="subtitle1" style={{ marginBottom: '8px' }}>
                             {game.stageInfo.name} 부수기 성공!
                         </Text>
                         <div style={{ fontSize: '32px', fontWeight: '700', color: '#3182F6', margin: '16px 0' }}>
-                            +{rewardAmount}원
+                            +{rewardAmount}나사
                         </div>
                         <Text typography="body3" color="grey600" style={{ marginBottom: '24px' }}>
-                            토스포인트가 적립되었어요
+                            나사를 모아 토스포인트로 바꿔보세요!
                         </Text>
                         <Button size="large" onClick={handleGoNext} style={{ width: '100%' }}>
                             {game.isLastStage ? '오늘의 결과 보기' : '다음 물건 부수러 가기'}
