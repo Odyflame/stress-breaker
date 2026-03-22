@@ -54,6 +54,14 @@ export function useGameLogic() {
     // 마지막 스테이지인지 확인
     const isLastStage = currentStage >= STAGE_DATA.length;
 
+    // 게임 초기화
+    const resetGame = useCallback(() => {
+        setCurrentStage(1);
+        setCurrentHP(STAGE_DATA[0].maxHP);
+        setTotalPoints(0);
+        setAllCleared(false);
+    }, []);
+
     return {
         currentStage,
         currentHP,
@@ -64,5 +72,6 @@ export function useGameLogic() {
         handleTouch,
         calculateReward,
         nextStage,
+        resetGame,
     };
 }

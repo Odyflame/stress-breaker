@@ -18,7 +18,10 @@ export default function App() {
   const [screen, setScreen] = useState<'lobby' | 'playing' | 'result'>('lobby');
 
   const goToPlaying = () => setScreen('playing');
-  const goToLobby = () => setScreen('lobby');
+  const goToLobby = () => {
+    game.resetGame();
+    setScreen('lobby');
+  };
   const goToResult = () => setScreen('result');
 
   // allCleared 시 자동으로 result 화면 전환
