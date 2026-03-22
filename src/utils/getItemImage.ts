@@ -1,24 +1,30 @@
 /**
  * 아이템별 이미지 경로를 반환하는 유틸리티
  *
- * 폴더 구조: /images/{아이템영문명}-{단계번호}.png
+ * 폴더 구조: /images/{아이템영문명}/{아이템영문명}-{단계번호}.{확장자}
  */
 
-const ITEM_KEY_MAP: Record<string, string> = {
-    '마우스': 'mouse',
-    '키보드': 'keyboard',
-    '모니터': 'monitor',
-    '맥북': 'macbook',
-    '사무실 의자': 'chair',
-    '스마트폰': 'phone',
+interface ItemImageConfig {
+    folder: string;
+    ext: string;
+    phases: number;
+}
+
+const ITEM_IMAGE_CONFIG: Record<string, ItemImageConfig> = {
+    '마우스': { folder: 'mouse', ext: 'jpeg', phases: 5 },
+    '키보드': { folder: 'keyboard', ext: 'png', phases: 5 },
+    '모니터': { folder: 'monitor', ext: 'jpeg', phases: 5 },
+    '사무실 의자': { folder: 'chair', ext: 'jpeg', phases: 1 },
+    '스마트폰': { folder: 'iphone', ext: 'jpeg', phases: 5 },
 };
 
 export function getItemImagePath(itemName: string, phase: number): string | null {
-    const key = ITEM_KEY_MAP[itemName];
-    if (!key) return null;
-    return `/images/${key}/${key}-${phase}.png`;
+    const config = ITEM_IMAGE_CONFIG[itemName];
+    if (!config) return null;
+    const clampedPhase = Math.min(phase, config.phases);
+    return `/images/${config.folder}/${config.folder}-${clampedPhase}.${config.ext}`;
 }
 
 export function hasItemImages(itemName: string): boolean {
-    return itemName in ITEM_KEY_MAP;
+    return itemName in ITEM_IMAGE_CONFIG;
 }

@@ -2,18 +2,19 @@ import { useState, useCallback } from 'react';
 
 // 아이템 밸런스 테이블 (자판기 제거)
 export const STAGE_DATA = [
-    { step: 1, name: '마우스', maxHP: 25, place: '내 책상' },
-    { step: 2, name: '키보드', maxHP: 50, place: '내 책상' },
-    { step: 3, name: '모니터', maxHP: 100, place: '내 책상' },
-    { step: 4, name: '맥북', maxHP: 150, place: '회의실' },
-    { step: 5, name: '사무실 의자', maxHP: 200, place: '사무실 복도' },
-    { step: 6, name: '스마트폰', maxHP: 500, place: '사장님실 앞' },
+    { step: 1, name: '마우스', maxHP: 5, place: '내 책상' },
+    { step: 2, name: '키보드', maxHP: 5, place: '내 책상' },
+    { step: 3, name: '모니터', maxHP: 5, place: '내 책상' },
+    { step: 4, name: '맥북', maxHP: 5, place: '회의실' },
+    { step: 5, name: '사무실 의자', maxHP: 5, place: '사무실 복도' },
+    { step: 6, name: '스마트폰', maxHP: 5, place: '사장님실 앞' },
 ];
 
 export function useGameLogic() {
     const [currentStage, setCurrentStage] = useState(1);
     const [currentHP, setCurrentHP] = useState(STAGE_DATA[0].maxHP);
     const [totalPoints, setTotalPoints] = useState(0);
+    const [allCleared, setAllCleared] = useState(false);
 
     // 햅틱 진동 Mock
     const triggerHaptic = useCallback(() => {
@@ -44,14 +45,22 @@ export function useGameLogic() {
         if (next <= STAGE_DATA.length) {
             setCurrentStage(next);
             setCurrentHP(STAGE_DATA[next - 1].maxHP);
+        } else {
+            // 모든 스테이지 완료
+            setAllCleared(true);
         }
     }, [currentStage]);
+
+    // 마지막 스테이지인지 확인
+    const isLastStage = currentStage >= STAGE_DATA.length;
 
     return {
         currentStage,
         currentHP,
-        stageInfo: STAGE_DATA[currentStage - 1],
+        stageInfo: STAGE_DATA[Math.min(currentStage - 1, STAGE_DATA.length - 1)],
         totalPoints,
+        allCleared,
+        isLastStage,
         handleTouch,
         calculateReward,
         nextStage,

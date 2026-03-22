@@ -1,15 +1,60 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useAnimation } from 'framer-motion';
-import { Top, Button } from '@toss/tds-mobile';
+import { Top, Button, Text } from '@toss/tds-mobile';
 import { getItemImagePath, hasItemImages } from '../utils/getItemImage';
+
+const AD_GROUP_ID = 'ait.dev.43daa14da3ae487b';
+
+// 토스 런타임에서 주입되는 광고 API를 안전하게 접근
+function getAdApi() {
+    try {
+        const fw = (window as any).__APPS_IN_TOSS__;
+        if (fw?.loadFullScreenAd && fw?.showFullScreenAd) {
+            return { loadFullScreenAd: fw.loadFullScreenAd, showFullScreenAd: fw.showFullScreenAd };
+        }
+    } catch { /* ignore */ }
+    return null;
+}
 
 export function StageView({ game, onEnd }: any) {
     const [showReward, setShowReward] = useState(false);
-    const [showAd, setShowAd] = useState(false);
     const [rewardAmount, setRewardAmount] = useState(0);
+    const [isAdLoaded, setIsAdLoaded] = useState(false);
     const controls = useAnimation();
+    const unregisterRef = useRef<(() => void) | null>(null);
 
     const isFirstStage = game.currentStage === 1;
+
+    // 광고 로드 시도
+    const tryLoadAd = useCallback(() => {
+        const api = getAdApi();
+        if (!api) return;
+
+        try {
+            unregisterRef.current = api.loadFullScreenAd({
+                options: { adGroupId: AD_GROUP_ID },
+                onEvent: (event: any) => {
+                    if (event.type === 'loaded') {
+                        console.log('광고 로드 완료');
+                        setIsAdLoaded(true);
+                    }
+                },
+                onError: (error: unknown) => {
+                    console.error('광고 로드 실패:', error);
+                },
+            });
+        } catch (e) {
+            console.warn('광고 로드 API 호출 실패:', e);
+        }
+    }, []);
+
+    // 컴포넌트 마운트 시 광고 로드
+    useEffect(() => {
+        tryLoadAd();
+        return () => {
+            unregisterRef.current?.();
+        };
+    }, [tryLoadAd]);
 
     const hitItem = async () => {
         if (game.currentHP <= 0) return;
@@ -21,16 +66,23 @@ export function StageView({ game, onEnd }: any) {
     };
 
     useEffect(() => {
-        if (game.currentHP <= 0 && !showReward && !showAd) {
+        if (game.currentHP <= 0 && !showReward) {
             const amount = game.calculateReward();
             setRewardAmount(amount);
             setShowReward(true);
         }
-    }, [game.currentHP, showReward, showAd, game]);
+    }, [game.currentHP, showReward, game]);
 
-    // 포인트 팝업 → "다음 물건" 버튼 클릭 시
+    // 포인트 팝업 → 버튼 클릭 시
     const handleGoNext = () => {
         setShowReward(false);
+
+        // 마지막 스테이지면 완료 처리
+        if (game.isLastStage) {
+            game.nextStage();
+            onEnd();
+            return;
+        }
 
         // 첫 번째 스테이지면 광고 없이 바로 넘어감
         if (isFirstStage) {
@@ -38,14 +90,30 @@ export function StageView({ game, onEnd }: any) {
             return;
         }
 
-        // 이후 스테이지는 광고 표시
-        setShowAd(true);
-    };
+        // 광고 표시 시도
+        const api = getAdApi();
+        if (api && isAdLoaded) {
+            try {
+                api.showFullScreenAd({
+                    options: { adGroupId: AD_GROUP_ID },
+                    onEvent: (event: any) => {
+                        if (event.type === 'dismissed' || event.type === 'failedToShow') {
+                            setIsAdLoaded(false);
+                            game.nextStage();
+                            tryLoadAd(); // 다음 광고 미리 로드
+                        }
+                    },
+                    onError: () => {
+                        game.nextStage();
+                    },
+                });
+                return;
+            } catch (e) {
+                console.warn('광고 표시 실패:', e);
+            }
+        }
 
-    // 광고 시청 완료 → 다음 물건 1단계로
-    const handleAdComplete = () => {
-        console.log('광고 시청 완료');
-        setShowAd(false);
+        // 광고 불가 시 바로 넘어감
         game.nextStage();
     };
 
@@ -62,19 +130,29 @@ export function StageView({ game, onEnd }: any) {
             <Top
                 title={
                     <Top.TitleParagraph>
-                        남은 HP: {game.currentHP} / {game.stageInfo.maxHP}
+                        {game.stageInfo.place} - {game.stageInfo.name}
                     </Top.TitleParagraph>
                 }
                 subtitleTop={
                     <Top.SubtitleParagraph>
-                        현재 스테이지: {game.currentStage} ({game.stageInfo.name})
+                        스테이지 {game.currentStage} / {6}
                     </Top.SubtitleParagraph>
                 }
             />
 
             <div style={{ padding: '0 24px' }}>
-                <div style={{ width: '100%', height: '12px', backgroundColor: '#eee', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ width: `${hpPercentage}%`, height: '100%', backgroundColor: hpPercentage > 30 ? '#0064FF' : '#FF4F4F', transition: 'width 0.2s' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <Text as="span" typography="caption1" color="grey600">HP</Text>
+                    <Text as="span" typography="caption1" color="grey600">{game.currentHP} / {game.stageInfo.maxHP}</Text>
+                </div>
+                <div style={{ width: '100%', height: '8px', backgroundColor: '#F4F4F5', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                        width: `${hpPercentage}%`,
+                        height: '100%',
+                        backgroundColor: hpPercentage > 50 ? '#3182F6' : hpPercentage > 25 ? '#F59E0B' : '#EF4444',
+                        transition: 'width 0.15s ease-out',
+                        borderRadius: '4px',
+                    }} />
                 </div>
             </div>
 
@@ -84,7 +162,7 @@ export function StageView({ game, onEnd }: any) {
             >
                 <motion.div
                     animate={controls}
-                    style={{ width: '250px', height: '250px', backgroundColor: hasItemImages(game.stageInfo.name) ? 'transparent' : '#eee', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', cursor: 'pointer', userSelect: 'none', overflow: 'hidden' }}
+                    style={{ width: '250px', height: '250px', backgroundColor: hasItemImages(game.stageInfo.name) ? 'transparent' : '#F4F4F5', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', cursor: 'pointer', userSelect: 'none', overflow: 'hidden' }}
                 >
                     {hasItemImages(game.stageInfo.name) ? (
                         <img
@@ -99,35 +177,28 @@ export function StageView({ game, onEnd }: any) {
                 </motion.div>
             </div>
 
-            <div style={{ padding: '0 24px 24px 24px', textAlign: 'center', color: '#999' }}>
-                <p>화면 중앙의 물건을 마구 터치하세요!</p>
+            <div style={{ padding: '0 24px 24px 24px', textAlign: 'center' }}>
+                <Text typography="caption1" color="grey500">
+                    화면 중앙의 물건을 마구 터치하세요!
+                </Text>
             </div>
 
             {/* 포인트 획득 팝업 */}
             {showReward && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-                    <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '24px', width: '80%', textAlign: 'center' }}>
-                        <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>포인트 획득!</h3>
-                        <p style={{ color: '#666', marginBottom: '24px' }}>
-                            {game.stageInfo.name} 부수기 성공!<br />보상으로 {rewardAmount}원을 받았습니다.
-                        </p>
+                    <div style={{ backgroundColor: '#fff', borderRadius: '24px', padding: '32px 24px', width: '80%', textAlign: 'center' }}>
+                        <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎉</div>
+                        <Text as="h3" typography="subtitle1" style={{ marginBottom: '8px' }}>
+                            {game.stageInfo.name} 부수기 성공!
+                        </Text>
+                        <div style={{ fontSize: '32px', fontWeight: '700', color: '#3182F6', margin: '16px 0' }}>
+                            +{rewardAmount}원
+                        </div>
+                        <Text typography="body3" color="grey600" style={{ marginBottom: '24px' }}>
+                            토스포인트가 적립되었어요
+                        </Text>
                         <Button size="large" onClick={handleGoNext} style={{ width: '100%' }}>
-                            다음 물건 부수러 가기
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            {/* 광고 팝업 (Mock) */}
-            {showAd && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-                    <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '32px', width: '80%', textAlign: 'center' }}>
-                        <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>📺 광고</h3>
-                        <p style={{ color: '#666', marginBottom: '24px' }}>
-                            광고를 시청하면 다음 물건을 부술 수 있습니다.
-                        </p>
-                        <Button size="large" onClick={handleAdComplete} style={{ width: '100%' }}>
-                            광고 시청 완료
+                            {game.isLastStage ? '오늘의 결과 보기' : '다음 물건 부수러 가기'}
                         </Button>
                     </div>
                 </div>

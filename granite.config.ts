@@ -8,10 +8,10 @@ export default defineConfig({
         icon: 'https://static.toss.im/appsintoss/0000/granite.png', // 임시 로고
     },
     web: {
-        host: 'localhost',
-        port: 8080,
+        host: 'localhost', // 실기기에서 접근 가능한 로컬 네트워크 IP (ipconfig getifaddr en0)
+        port: 5173, // Vite 웹 서버 포트 (Metro 포트와 별도)
         commands: {
-            dev: 'vite',
+            dev: 'vite --host', // --host 옵션으로 네트워크 노출
             build: 'vite build',
         },
     },

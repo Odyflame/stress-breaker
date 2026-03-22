@@ -3,7 +3,7 @@ import { TDSMobileProvider } from '@toss/tds-mobile';
 import { LobbyView } from './components/LobbyView';
 import { StageView } from './components/StageView';
 import { ResultView } from './components/ResultView';
-import { useGameLogic, STAGE_DATA } from './hooks/useGameLogic';
+import { useGameLogic } from './hooks/useGameLogic';
 
 const defaultUserAgent = {
   fontA11y: undefined,
@@ -21,12 +21,12 @@ export default function App() {
   const goToLobby = () => setScreen('lobby');
   const goToResult = () => setScreen('result');
 
-  // 모두 클리어 시
+  // allCleared 시 자동으로 result 화면 전환
   useEffect(() => {
-    if (game.currentStage > STAGE_DATA.length && screen !== 'result') {
+    if (game.allCleared && screen !== 'result') {
       setScreen('result');
     }
-  }, [game.currentStage, screen]);
+  }, [game.allCleared, screen]);
 
   return (
     <TDSMobileProvider userAgent={defaultUserAgent}>
