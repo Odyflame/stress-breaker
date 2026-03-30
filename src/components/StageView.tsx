@@ -1,40 +1,42 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 import { Top, Button, Text } from '@toss/tds-mobile';
+import { loadFullScreenAd, showFullScreenAd } from '@apps-in-toss/web-framework';
 import { getItemImagePath, hasItemImages } from '../utils/getItemImage';
+import { useSound } from '../hooks/useSound';
 
-const AD_GROUP_ID = 'ait.dev.43daa14da3ae487b';
+// 전면형 광고 테스트 ID
+const AD_GROUP_ID = 'ait-ad-test-interstitial-id';
 
-// 토스 런타임에서 주입되는 광고 API를 안전하게 접근
-function getAdApi() {
-    try {
-        const fw = (window as any).__APPS_IN_TOSS__;
-        if (fw?.loadFullScreenAd && fw?.showFullScreenAd) {
-            return { loadFullScreenAd: fw.loadFullScreenAd, showFullScreenAd: fw.showFullScreenAd };
-        }
-    } catch { /* ignore */ }
-    return null;
-}
-
-export function StageView({ game, onEnd }: any) {
+export function StageView({ game, boltStorage, onEnd }: any) {
     const [showReward, setShowReward] = useState(false);
     const [rewardAmount, setRewardAmount] = useState(0);
     const [isAdLoaded, setIsAdLoaded] = useState(false);
     const controls = useAnimation();
-    const unregisterRef = useRef<(() => void) | null>(null);
+    const { playSound } = useSound();
 
-    const isFirstStage = game.currentStage === 1;
+    // 이 스테이지에서 이미 보상을 줬는지(팝업을 띄웠는지) 체크
+    const rewardGivenStageRef = useRef(-1);
+
+    const unregisterLoadRef = useRef<(() => void) | null>(null);
+    const unregisterShowRef = useRef<(() => void) | null>(null);
+    const isMountedRef = useRef(true);
+
+    const isSecondStage = game.currentStage === 2;
 
     // 광고 로드 시도
     const tryLoadAd = useCallback(() => {
-        const api = getAdApi();
-        if (!api) return;
+        if (!loadFullScreenAd.isSupported()) {
+            console.warn('전면 광고 기능을 사용할 수 없는 환경입니다.');
+            return;
+        }
 
         try {
-            unregisterRef.current = api.loadFullScreenAd({
+            unregisterLoadRef.current?.();
+            unregisterLoadRef.current = loadFullScreenAd({
                 options: { adGroupId: AD_GROUP_ID },
-                onEvent: (event: any) => {
-                    if (event.type === 'loaded') {
+                onEvent: (event) => {
+                    if (event.type === 'loaded' && isMountedRef.current) {
                         console.log('광고 로드 완료');
                         setIsAdLoaded(true);
                     }
@@ -48,16 +50,23 @@ export function StageView({ game, onEnd }: any) {
         }
     }, []);
 
-    // 컴포넌트 마운트 시 광고 로드
+    // 컴포넌트 마운트/언마운트 관리
     useEffect(() => {
+        isMountedRef.current = true;
         tryLoadAd();
         return () => {
-            unregisterRef.current?.();
+            isMountedRef.current = false;
+            unregisterLoadRef.current?.();
+            unregisterLoadRef.current = null;
+            unregisterShowRef.current?.();
+            unregisterShowRef.current = null;
+            controls.stop();
         };
-    }, [tryLoadAd]);
+    }, [tryLoadAd, controls]);
 
     const hitItem = async () => {
         if (game.currentHP <= 0) return;
+        playSound(game.stageInfo.name);
         game.handleTouch();
         controls.start({
             x: [0, -10, 10, -10, 10, 0],
@@ -66,15 +75,18 @@ export function StageView({ game, onEnd }: any) {
     };
 
     useEffect(() => {
-        if (game.currentHP <= 0 && !showReward) {
+        if (game.currentHP <= 0 && !showReward && rewardGivenStageRef.current !== game.currentStage) {
+            rewardGivenStageRef.current = game.currentStage;
             const amount = game.calculateReward();
             setRewardAmount(amount);
+            boltStorage.addBolts(amount); // Persist to storage
             setShowReward(true);
         }
-    }, [game.currentHP, showReward, game]);
+    }, [game.currentHP, showReward, game, boltStorage]);
 
     // 포인트 팝업 → 버튼 클릭 시
     const handleGoNext = () => {
+        // 즉시 팝업을 닫음
         setShowReward(false);
 
         // 마지막 스테이지면 완료 처리
@@ -84,37 +96,45 @@ export function StageView({ game, onEnd }: any) {
             return;
         }
 
-        // 첫 번째 스테이지면 광고 없이 바로 넘어감
-        if (isFirstStage) {
+        // 두 번째 스테이지(키보드)면 광고 없이 바로 넘어감
+        if (isSecondStage) {
             game.nextStage();
             return;
         }
 
-        // 광고 표시 시도
-        const api = getAdApi();
-        if (api && isAdLoaded) {
-            try {
-                api.showFullScreenAd({
-                    options: { adGroupId: AD_GROUP_ID },
-                    onEvent: (event: any) => {
-                        if (event.type === 'dismissed' || event.type === 'failedToShow') {
-                            setIsAdLoaded(false);
+        // 상태 업데이트(팝업 닫힘)가 화면에 반영될 시간을 주기 위해 setTimeout 사용
+        setTimeout(() => {
+            // 광고 표시 시도
+            if (showFullScreenAd.isSupported() && isAdLoaded) {
+                try {
+                    unregisterShowRef.current?.();
+                    unregisterShowRef.current = showFullScreenAd({
+                        options: { adGroupId: AD_GROUP_ID },
+                        onEvent: (event) => {
+                            if (!isMountedRef.current) return;
+                            switch (event.type) {
+                                case 'dismissed':
+                                case 'failedToShow':
+                                    setIsAdLoaded(false);
+                                    game.nextStage();
+                                    tryLoadAd(); // 다음 광고 미리 로드
+                                    break;
+                            }
+                        },
+                        onError: () => {
+                            if (!isMountedRef.current) return;
                             game.nextStage();
-                            tryLoadAd(); // 다음 광고 미리 로드
-                        }
-                    },
-                    onError: () => {
-                        game.nextStage();
-                    },
-                });
-                return;
-            } catch (e) {
-                console.warn('광고 표시 실패:', e);
+                        },
+                    });
+                    return;
+                } catch (e) {
+                    console.warn('광고 표시 실패:', e);
+                }
             }
-        }
 
-        // 광고 불가 시 바로 넘어감
-        game.nextStage();
+            // 광고 불가 시 바로 넘어감
+            game.nextStage();
+        }, 300);
     };
 
     const hpPercentage = Math.max(0, (game.currentHP / game.stageInfo.maxHP) * 100);
@@ -192,7 +212,7 @@ export function StageView({ game, onEnd }: any) {
                             {game.stageInfo.name} 부수기 성공!
                         </Text>
                         <div style={{ fontSize: '32px', fontWeight: '700', color: '#3182F6', margin: '16px 0' }}>
-                            +{rewardAmount}나사
+                            +{rewardAmount} 나사
                         </div>
                         <Text typography="body3" color="grey600" style={{ marginBottom: '24px' }}>
                             나사를 모아 토스포인트로 바꿔보세요!

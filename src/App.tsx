@@ -4,6 +4,7 @@ import { LobbyView } from './components/LobbyView';
 import { StageView } from './components/StageView';
 import { ResultView } from './components/ResultView';
 import { useGameLogic } from './hooks/useGameLogic';
+import { useBoltStorage } from './hooks/useBoltStorage';
 
 const defaultUserAgent = {
   fontA11y: undefined,
@@ -14,6 +15,7 @@ const defaultUserAgent = {
 
 export default function App() {
   const game = useGameLogic();
+  const boltStorage = useBoltStorage();
   // 'lobby' | 'playing' | 'result'
   const [screen, setScreen] = useState<'lobby' | 'playing' | 'result'>('lobby');
 
@@ -33,14 +35,15 @@ export default function App() {
 
   return (
     <TDSMobileProvider userAgent={defaultUserAgent}>
-      {screen === 'lobby' && <LobbyView game={game} onStart={goToPlaying} />}
+      {screen === 'lobby' && <LobbyView game={game} boltStorage={boltStorage} onStart={goToPlaying} onGoConvert={goToResult} />}
       {screen === 'playing' && (
         <StageView
           game={game}
+          boltStorage={boltStorage}
           onEnd={goToResult}
         />
       )}
-      {screen === 'result' && <ResultView totalBolts={game.totalBolts} onReset={goToLobby} />}
+      {screen === 'result' && <ResultView boltStorage={boltStorage} isCompleted={game.allCleared} onReset={goToLobby} />}
     </TDSMobileProvider>
   );
 }

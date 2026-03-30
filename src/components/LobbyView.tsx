@@ -2,7 +2,7 @@ import { Button, Top } from '@toss/tds-mobile';
 import { getItemImagePath, hasItemImages } from '../utils/getItemImage';
 import { STAGE_DATA } from '../hooks/useGameLogic';
 
-export function LobbyView({ game, onStart }: any) {
+export function LobbyView({ game, boltStorage, onStart, onGoConvert }: any) {
     return (
         <div style={{ flex: 1, backgroundColor: '#f9f9f9', height: '100vh', display: 'flex', flexDirection: 'column' }}>
             <Top
@@ -17,6 +17,30 @@ export function LobbyView({ game, onStart }: any) {
                     </Top.SubtitleParagraph>
                 }
             />
+
+            {/* 나사 현황 및 포인트 전환 배너 */}
+            <div style={{ padding: '16px 24px 0 24px' }}>
+                <div style={{
+                    backgroundColor: '#EFF6FF',
+                    borderRadius: '16px',
+                    padding: '16px 20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                }}>
+                    <div>
+                        <div style={{ fontSize: '13px', color: '#4E5968', marginBottom: '4px' }}>내 나사 🔩</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#3182F6' }}>
+                            {boltStorage.savedBolts}개
+                        </div>
+                    </div>
+                    {boltStorage.savedBolts >= 10 && (
+                        <Button size="small" color="primary" onClick={onGoConvert}>
+                            포인트로 바꾸기
+                        </Button>
+                    )}
+                </div>
+            </div>
 
             <div style={{ padding: '24px', textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>{game.stageInfo?.name}</h2>
